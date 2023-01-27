@@ -1,0 +1,87 @@
+<form class="form-horizontal" method="post" action="#">
+    <h5 v-if="form_login.error" class="text-danger">error</h5>
+    <div class="form-group" style="margin-bottom: 5px;">
+        <select v-model="form_ssl.option"  id="options" name="options">
+          <option value="manual">Manually</option>
+          <option value="acme">Let's Encrypt</option>
+          <option value="external">External SSL Proxy</option>
+        </select>
+    </div>
+    <div v-if="form_ssl.error" style="width: 100%; height: 20px;">
+        <span
+                class="text-danger"
+                style="float: right;">
+            [[ form_ssl.error ]]
+        </span>
+    </div>
+    <div
+            class="form-group" style="margin-bottom: 5px; margin-top: 40px;"
+    >
+        <p v-if="form_ssl.option == 'manual'" class="blockquote-footer">
+            This case is prefer if You have SSL <b>certificate</b> and <b>private key</b> files.
+            Pass them to environment variables <b>CERT_FILE</b> and <b>CERT_KEY_FILE</b>
+            See example <a target="_blank" href="https://github.com/Sirius-social/didcomm-mediator/blob/main/docs/SSL_and_Proxy.md#case-1-you-already-have-ssl-cert-and-cert_key-files">here</a>
+        </p>
+        <p v-if="form_ssl.option == 'acme'" class="blockquote-footer">
+            If you don't have SSL <b>certificate</b> and you don't want to <b>buy it</b>, you may automate certificates issuing
+            and updating every 2 month via <a target="_blank" href="https://letsencrypt.org/">Let's Encrypt service</a>
+            This application has <b>pre-installed certbot</b> in docker container and you should configure minimum options to
+            start.
+            See example <a target="_blank" href="https://github.com/Sirius-social/didcomm-mediator/blob/main/docs/SSL_and_Proxy.md#case-2-you-dont-have-ssl-cert-and-cert_key-files-and-you-want-to-automate-certs-update-via-lets-encrypt">here</a>
+        </p>
+        <p v-if="form_ssl.option == 'external'" class="blockquote-footer">
+            If you deploy Mediator application in the datacenter or cloud, if you use Orchestration like <b>Kubernetes</b>
+            or <b>Multi-Tower</b> architecture with external proxy+load-balancer,
+            you should public <b>8000</b> http port to avoid traffics overheads through in-container running nginx.
+            See example <a target="_blank" href="https://github.com/Sirius-social/didcomm-mediator/blob/main/docs/SSL_and_Proxy.md#case-3-you-are-going-to-run-mediator-app-behind-external-proxy-kubernetes-or-multi-tower-approach-with-external-load-balancer">here</a>
+        </p>
+    </div>
+    <div
+            v-if="form_ssl.option == 'acme'"
+            class="form-group"
+            style="margin-bottom: 15px;"
+    >
+        <label class="fw-light" for="acme-email" class="cols-sm-2 control-label">Let's Encrypt registration email</label>
+        <div class="cols-sm-10">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fa fa-users fa" aria-hidden="true"></i></span>
+                <input v-model="form_ssl.acme_email" type="text" class="form-control" name="acme-email" id="acme-email" placeholder="Enter Email" />
+            </div>
+        </div>
+        <div class="form-check">
+          <input v-model="form_ssl.acme_share_email" class="form-check-input" type="checkbox" value="" id="acme-email-share">
+          <label
+                  class="form-check-label fw-light" for="acme-email-share"
+                  title="Would you be willing to share your email address with the Electronic Frontier
+Foundation, a founding partner of the Let's Encrypt project and the non-profit
+organization that develops Certbot? We'd like to send you email about our work
+encrypting the web, EFF news, campaigns, and ways to support digital freedom."
+          >
+            Share your email address with the Electronic Frontier Foundation
+            <img
+                    src="{{ url_for('static', path='/icons/q.png') }}" style="max-width: 18px;"
+            >
+          </label>
+        </div>
+        <label class="fw-light" for="acme-webroot-url" class="cols-sm-2 control-label">Domain</label>
+        <div class="cols-sm-10">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fa fa-users fa" aria-hidden="true"></i></span>
+                <input readonly="true" v-model="form_webroot.url" type="text" class="form-control" name="acme-webroot-url" id="acme-webroot-url" placeholder="Domain" />
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <button @click="current_step -= 1" type="button" class="col btn btn-outline-secondary btn-lg btn-block login-button" style="margin-right: 50px;">< Prev</button>
+        <button
+                type="button"
+                class="col btn btn-primary btn-lg btn-block login-button"
+                :disabled="!ssl_apply_enabled || form_ssl.loading"
+                @click="set_ssl_option()"
+        >
+            Apply
+            <img v-if="form_ssl.loading" src="/static/icons/loading.gif" style="width: 50px; height: 30px;">
+        </button>
+
+    </div>
+</form>

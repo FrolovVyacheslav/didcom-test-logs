@@ -1,0 +1,35 @@
+version: '3'
+
+services: 
+  db:
+    image: postgres:13.1
+    environment:
+      - POSTGRES_PASSWORD=postgres
+
+  memcached:
+    image: memcached
+
+  redis1:
+    image: redis
+  redis2:
+    image: redis
+
+  app:
+    image: socialsirius/didcomm
+    environment:
+      - MEMCACHED=memcached
+      - REDIS=redis://redis1,redis://redis2
+      - DATABASE_HOST=db
+      - DATABASE_USER=postgres
+      - DATABASE_NAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - SEED="pass here earlier generated unique seed"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8000:8000"
+    depends_on:
+      - db
+      - memcached
+      - redis1
+      - redis2

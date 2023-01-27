@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin panel</title>
+    <link rel="icon" type="image/png" href="/static/icons/favicon.png"/>
+    <link href="{{ static.styles }}" rel="stylesheet">
+    <script src="{{ static.vue }}"></script>
+    <script src="{{ static.axios }}"></script>
+    <script src="{{ static.jquery }}"></script>
+</head>
+
+<body id="top">
+<!-- Navigation-->
+<nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm" id="mainNav">
+    <div class="container px-5">
+        <img src="{{ url_for('static', path='/icons/logo.png') }}" style="max-width: 70px; max-height:70px;">
+        <a class="navbar-brand fw-bold" href="#">Launch DIDComm server components</a>
+        <button aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler"
+                data-bs-target="#navbarResponsive" data-bs-toggle="collapse" type="button">
+            Menu
+            <i class="bi-list"></i>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+            <ul class="navbar-nav ms-auto me-4 my-3 my-lg-0">
+                <li class="nav-item"><a class="nav-link me-lg-3" href="{{features}}" target="_blank">Features</a></li>
+                <li class="nav-item"><a class="nav-link me-lg-3" href="{{download}}" target="_blank">Download</a></li>
+                {% if current_user %}
+                    <li class="nav-item"><a class="nav-link me-lg-3" href="{{ base_url }}/logout">Logout [{{ current_user.username }}]</a></li>
+                {% endif %}
+            </ul>
+            <!--
+            <button class="btn btn-primary rounded-pill px-3 mb-2 mb-lg-0" data-bs-target="#feedbackModal"
+                    data-bs-toggle="modal">
+                        <span class="d-flex align-items-center">
+                            <i class="bi-chat-text-fill me-2"></i>
+                            <span class="small">Send Feedback</span>
+                        </span>
+            </button>
+            -->
+        </div>
+    </div>
+</nav>
+<!-- Mashead header-->
+<header class="masthead" id="app">
+
+    <!-- Prompt  Modal -------->
+    <div class="modal" id="form-modal" style="background-color: rgba(0,0,0,0.3)" tabindex="-1" role="dialog" aria-labelledby="original" aria-hidden="true">
+      <div class="modal-dialog modal-md" role="document" style="margin-top:10%;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="text-primary modal-title" >[[ form_modal.title ]]</h5>
+          </div>
+          <div class="modal-body">
+              <p class="text-danger">[[ form_modal.prompt ]]</p>
+              <button @click="close_modal_form(false)" class="btn btn-primary">Decline</button>
+              <button @click="close_modal_form(true)" class="btn btn-danger" style="float: right;">Accept</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Create static connection Modal -------->
+    <div class="modal" id="create-conn-modal" style="background-color: rgba(0,0,0,0.3)" tabindex="-1" role="dialog" aria-labelledby="original" aria-hidden="true">
+      <div class="modal-dialog modal-md" role="document" style="margin-top:10%;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="text-primary modal-title" >Create static connection</h5>
+          </div>
+          <div class="modal-body">
+              {% include 'forms/static_connection.html' %}
+              <button @click="close_create_static_conn_modal" class="btn btn-primary">Decline</button>
+              <button @click="create_static_conn" class="btn btn-danger" style="float: right;">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="container px-5">
+        <div class="row gx-5 align-items-center">
+            {% if not app_is_configured or not current_user %}
+                <div class="col-lg-6">
+                    <!-- Register form-->
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <!--
+                               Login form
+                            -->
+                            <div v-if="current_step == 0" class="card">
+                                <div class="card-header">Login</div>
+                                <div class="card-body">
+                                    {% include "forms/login.html" %}
+                                </div>
+                            </div>
+                            <!--
+                               Form for creation admin account (if not exists)
+                            -->
+                            <div v-if="current_step == 1" class="card">
+                                <div class="card-header">Step-1: Create Admin account</div>
+                                <div class="card-body">
+                                    {% include "forms/create_user.html" %}
+                                </div>
+                            </div>
+                            <!--
+                               Form to configure webroot and LetsEncrypt
+                            -->
+                            <div v-if="current_step == 2" class="card">
+                                <div class="card-header">Step-2: Configure webroot URL</div>
+                                <div class="card-body">
+                                    {% include "forms/webroot.html" %}
+                                </div>
+                            </div>
+                            <!--
+                               Form to configure SSL & ACME
+                            -->
+                            <div v-if="current_step == 3" class="card">
+                                <div class="card-header">Step-3: Configure SSL</div>
+                                <div class="card-body">
+                                    {% include "forms/ssl.html" %}
+                                </div>
+                            </div>
+                            <!--
+                               Form to configure Firebase secrets
+                            -->
+                            <div v-if="current_step == 4" class="card">
+                                <div class="card-header">Step-4: Configure Firebase secrets</div>
+                                <div class="card-body">
+                                    {% include "forms/firebase.html" %}
+                                </div>
+                            </div>
+                            <!--
+                               Form to configure Emails
+                            -->
+                            <div v-if="current_step == 5" class="card">
+                                <div class="card-header">Step-5: Configure Email notifications</div>
+                                <div class="card-body">
+                                    {% include "forms/email.html" %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6" v-if="current_step == 4">
+                    <div v-if="!events_stream_is_active" class="masthead-device-mockup">
+                        <img src="/static/firebase.png" style="max-width: 700px;">
+                    </div>
+                </div>
+                <div class="col-lg-6" v-if="current_step != 4">
+                    <textarea id="log" v-if="events_stream_is_active" style="min-width: 500px;min-height: 400px;background-color: black; color: green;">
+                        [[ log ]]
+                    </textarea>
+                    <button
+                            v-if="events_stream_is_active"
+                            @click.prevent="events_stream_is_active = false; log = '';"
+                            type="button"
+                            class="btn btn-close btn-lg btn-block"
+                            style="float: right;"
+                    >
+                    </button>
+                    <!-- Masthead device mockup feature-->
+
+                    <div v-if="!events_stream_is_active" class="masthead-device-mockup">
+                        <img src="/static/icons/lunch.gif" style="max-width: 500px;">
+                    </div>
+
+                </div>
+            {% else %}
+                <div class="col-lg-12">
+                    <div class="row justify-content-center">
+                        <!--
+                           Invitation form
+                        -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Mediator Invitation <a @click.prevent="copy_invitation_to_clipboard" href="" style="float: right;cursor:pointer;"title="Copy to Clipboard"><img src="/static/icons/copy.svg" style="width: 30px;height: 30px; float: right; margin: 0 5px;"></img>Copy</a></div>
+                                <div class="invitation card-body">
+                                    <code>{
+                                        {% for key, value in invitation.items() recursive %}
+                                        {% if value is mapping %}
+                                        <p>
+                                         {% for it in range(loop.depth) %}&nbsp;&nbsp;{% endfor %}{{key}}: {
+                                        </p>
+                                        {{ loop(value.items()) }}
+                                        <p>
+                                          {% for it in range(loop.depth) %}&nbsp;&nbsp;{% endfor %}}
+                                        </p>
+                                        {% else %}
+                                        <p>
+                                            {% for it in range(loop.depth) %}&nbsp;&nbsp;{% endfor %}<span class="key">{{key}}:</span> {{value}},
+                                        </p>
+                                        {% endif %}
+                                        {% endfor %}
+                                    }</code>
+                                </div>
+                                <p class="blockquote-footer" style="margin-top: 10px;padding: 5px;">
+                                    Share this Invitation with Mobile developers to configure mobile device
+                                    to communicate with this App
+                                    <a target="_blank" href="{{ github }}/blob/main/docs/Developer.md">see developer docs</a>
+                                    <br/>
+                                    - see details here <a target="_blank" href="https://github.com/hyperledger/aries-rfcs/tree/main/features/0160-connection-protocol#example-invitation-encoding">aries-rfc-0160</a>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-5">
+                            <div class="card">
+                                <div class="card-header">Overview</div>
+                                <div class="card-body">
+                                    {% include 'forms/overview.html' %}
+                                </div>
+                                <p class="blockquote-footer" style="padding: 5px;">
+                                    See details here
+                                    <a target="_blank" href="{{ github }}/blob/main/docs/AdminGuide.md">Admin guide</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!--
+                   P2P connections table
+                -->
+                <div class="col-lg-12" style="margin-top: 10px;">
+                    <div class="row justify-content-center">
+                        <div class="col-md-11">
+                            <div class="card">
+                                <div class="card-header">Connections (recipients)</div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            {% include 'forms/connections.html' %}
+                                        </div>
+                                        <div class="col-5">
+                                            {% include 'forms/connection.details.html' %}
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!--
+                   Health checks
+                -->
+                <div class="col-lg-12" style="margin-top: 10px;">
+                    <div class="row justify-content-center">
+                        <!--
+                           P2P connections table
+                        -->
+                        <div class="col-md-11">
+                            <div class="card">
+                                <div class="card-header">Health check</div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col">
+                                            {% include "forms/healths.redis.html" %}
+                                        </div>
+                                        <div class="col">
+                                            {% include "forms/healths.services.html" %}
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+
+            {% endif %}
+        </div>
+    </div>
+</header>
+<!-- Quote/testimonial aside-->
+<aside class="text-center bg-gradient-primary-to-secondary">
+    <div class="container px-5">
+        <div class="row gx-5 justify-content-center">
+            <div class="col-xl-8">
+                <div class="h2 fs-1 text-white mb-4">"An intuitive solution to DIDComm Messaging,
+                    wrapped up in a single app!"
+                </div>
+            </div>
+        </div>
+    </div>
+</aside>
+<!-- Footer-->
+<footer class="bg-black text-center py-5">
+    <div class="container px-5">
+        <div class="text-white-50 small">
+            <a href="{{github}}" target="_blank">GitHub</a>
+            <span class="mx-1">&middot;</span>
+            <a href="{{issues}}" target="_blank">Issues</a>
+            <span class="mx-1">&middot;</span>
+            <a href="{{spec}}" target="_blank">Spec</a>
+        </div>
+    </div>
+</footer>
+
+<!-- VueJS  -->
+<script>
+    app = new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            current_step: {{ current_step }},
+            events_stream: '{{ events_stream }}',
+            events_stream_is_active: false,
+            invitation_json: {{ invitation | tojson  }},
+            log: '',
+            health: {{ health | tojson }},
+            pairwise_search: '{{ pairwise_search }}',
+            pairwise_details: null,
+            pairwise_cache: {
+                data: null,
+                total: null,
+                filtered_total: null,
+                page_size: 10,
+                current_page: 1,
+            },
+            form_login: {
+                username: '',
+                password: '',
+                error: ''
+            },
+            form_create_user: {
+                username: 'admin',
+                password1: '',
+                password2: '',
+                error: ''
+            },
+            form_webroot: {
+                url: '{{ settings.webroot }}',
+                env_url: {% if env.webroot %}'{{ env.webroot }}' {% else %} null {% endif %},
+                full_base_url: '{{ settings.full_base_url }}',
+                ping: 'starting',
+                error: ''
+            },
+            form_ssl: {
+                option: '{{ settings.ssl_option }}',
+                cert_file: '{{ env.cert_file }}',
+                cert_key_file: '{{ env.cert_key_file }}',
+                error: '',
+                acme_dir: '{{ env.acme_dir }}',
+                acme_email: '{{ settings.acme_email }}',
+                acme_share_email: {{ settings.acme_email_share }},
+                loading: false
+            },
+            form_firebase: {
+                api_key: "{{ settings.firebase_api_key }}",
+                sender_id: "{{ settings.firebase_sender_id }}",
+                error: "",
+                skip: {% if env.firebase_api_key %}false{% else %}true{% endif %},
+                env_firebase_api_key: "{{ env.firebase_api_key }}"
+            },
+            form_email: {
+                credentials: {{ settings.email_credentials | tojson  }},
+                option: '{{ settings.email_option }}',
+                error: "",
+                loading: false
+            },
+            form_modal: {
+                title: '',
+                prompt: '',
+                accept_cb: null
+            },
+            form_static_connection: {
+                error: '',
+                did: '',
+                verkey: '',
+                label: '',
+                fcm_device_enabled: false,
+                fcm_device_id: ''
+            }
+        },
+        methods: {
+            login: function(){
+                let url = '{{ base_url }}' + '/login';
+                let self = this;
+                axios.post(
+                    url, this.form_login
+                ).then(function (response) {
+                    self.form_login.error = null;
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    location.reload();
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    self.form_login.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            create_user: function(){
+                let url = '{{ base_url }}' + '/create_user';
+                let self = this;
+                axios.post(
+                    url, this.form_create_user
+                ).then(function (response) {
+                    self.form_create_user.error = null;
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    location.reload();
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    self.form_create_user.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            set_webroot: function(){
+                let url = '{{ base_url }}' + '/set_webroot';
+                let self = this;
+                axios.post(
+                    url, {value: self.form_webroot.url}
+                ).then(function (response) {
+                    self.form_webroot.error = null;
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    self.current_step += 1;
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    self.form_webroot.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            set_ssl_option: function(){
+                let url = '{{ base_url }}' + '/set_ssl_option';
+                let self = this;
+                self.form_ssl.loading = true;
+                axios.post(
+                    url, {
+                        value: self.form_ssl.option,
+                        email: self.form_ssl.acme_email,
+                        share_email: self.form_ssl.acme_share_email,
+                        stream: self.events_stream
+                    }
+                ).then(function (response) {
+                    self.form_ssl.loading = false;
+                    self.form_webroot.error = null;
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    self.current_step += 1;
+                }).catch(function (error) {
+                    self.form_ssl.loading = false;
+                    let detail = error.data.detail
+                    self.form_ssl.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            set_firebase_secret: function(){
+                let url = '{{ base_url }}' + '/set_firebase_secret';
+                let self = this;
+                axios.post(
+                    url, {
+                        api_key: self.form_firebase.api_key,
+                        sender_id: self.form_firebase.sender_id,
+                        skip: self.form_firebase.skip
+                    }
+                ).then(function (response) {
+                    self.form_firebase.error = null;
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    self.current_step += 1;
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    self.form_firebase.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            set_email_credentials: function(){
+                let url = '{{ base_url }}' + '/set_email_credentials';
+                let self = this;
+                self.form_email.error = '';
+                self.form_email.loading = true;
+                axios.post(
+                    url, {
+                        option: self.form_email.option,
+                        credentials: self.form_email.credentials,
+                    }
+                ).then(function (response) {
+                    self.form_email.loading = false;
+                    self.form_email.error = '';
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    location.reload();
+                }).catch(function (error) {
+                    self.form_email.loading = false;
+                    let detail = error.data.detail
+                    self.form_email.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            app_is_configured: function(on) {
+                let url = '{{ base_url }}' + '/set_app_is_configured';
+                let self = this;
+                let value = 'off'
+                if (on) {
+                    value = 'on';
+                }
+                axios.post(
+                    url, {
+                        value: value,
+                    }
+                ).then(function (response) {
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            copy_invitation_to_clipboard: function(){
+                var dummy = document.createElement("textarea");
+                // to avoid breaking orgain page when copying more words
+                // cant copy when adding below this code
+                // dummy.style.display = 'none'
+                document.body.appendChild(dummy);
+                //Be careful if you use texarea. setAttribute('value', value), which works with "input" does not work with "textarea". – Eduard
+                dummy.value = JSON.stringify(this.invitation_json, null, 2);
+                dummy.select();
+                document.execCommand("copy");
+                document.body.removeChild(dummy);
+            },
+            reset_settings: function(){
+                this.open_modal_form(
+                    'Reset Settings?',
+                    "Are you sure? All settings will be clean!!!",
+                    function (){
+                        let url = '{{ base_url }}' + '/set_app_is_configured';
+                        let value = 'off'
+                        axios.post(
+                            url, {
+                                value: value,
+                            }
+                        ).then(function (response) {
+                            console.log('======== SUCCESS ========')
+                            console.log(response);
+                            location.reload();
+                        }).catch(function (error) {
+                            let detail = error.data.detail
+                            console.log('======== ERROR ========')
+                            console.log(error.data);
+                        });
+                    }
+                );
+            },
+            open_modal_form: function(title, prompt, accept_callback){
+                this.form_modal.title = title;
+                this.form_modal.prompt = prompt;
+                this.form_modal.accept_cb = accept_callback;
+                $('#form-modal').show();
+            },
+            close_modal_form: function(accepted) {
+                if (accepted) {
+                    if (this.form_modal.accept_cb) {
+                        this.form_modal.accept_cb();
+                    }
+                }
+                $('#form-modal').hide();
+            },
+            shift_page: function(next) {
+                if (next){
+                    if (this.pairwise_cache.current_page < this.connections_page_count) {
+                        this.pairwise_cache.current_page += 1;
+                    }
+                }
+                else {
+                    if (this.pairwise_cache.current_page > 1) {
+                        this.pairwise_cache.current_page -= 1;
+                    }
+                }
+            },
+            open_create_static_conn_modal: function(){
+                this.form_static_connection.error = '';
+                this.form_static_connection.did = '';
+                this.form_static_connection.verkey = '';
+                this.form_static_connection.label = '';
+                $('#create-conn-modal').show();
+            },
+            close_create_static_conn_modal: function(){
+                $('#create-conn-modal').hide();
+            },
+            create_static_conn: function(){
+                let url = '{{ base_url }}' + '/create_static_connection';
+                let self = this;
+                axios.post(
+                    url, {
+                        label: self.form_static_connection.label,
+                        did: self.form_static_connection.did,
+                        verkey: self.form_static_connection.verkey,
+                        fcm_device_enabled: self.form_static_connection.fcm_device_enabled,
+                        fcm_device_id: self.form_static_connection.fcm_device_id
+                    }
+                ).then(function (response) {
+                    console.log('======== SUCCESS ========')
+                    console.log(response);
+                    let redirect_to = '{{ settings.full_base_url }}{{ base_url }}?search=' + self.form_static_connection.label;
+                    location.replace(redirect_to);
+                }).catch(function (error) {
+                    let detail = error.data.detail
+                    self.form_static_connection.error = detail;
+                    console.log('======== ERROR ========')
+                    console.log(error.data);
+                });
+            },
+            reload: function(){
+                let redirect_to = '{{ settings.full_base_url }}{{ base_url }}';
+                    location.replace(redirect_to);
+            }
+        },
+        computed: {
+            connections: function(){
+                if (this.pairwise_cache.data) {
+                    if (this.pairwise_search && this.pairwise_search.length > 1) {
+                        let result = [];
+                        let lower_search = this.pairwise_search.toLowerCase();
+                        for (const index in this.pairwise_cache.data) {
+                            let row = this.pairwise_cache.data[index];
+                            if (row.their_label.toLowerCase().includes(lower_search)) {
+                                result.push(row);
+                            }
+                        }
+                        this.pairwise_cache.filtered_total = result.length;
+                        return result;
+                    }
+                    else {
+                        return this.pairwise_cache.data;
+                    }
+                }
+                else {
+                    let url = '{{ base_url }}' + '/load_pairwise_collection';
+                    let self = this;
+                    axios.post(
+                        url, {
+                            //search: this.pairwise_search,
+                        }
+                    ).then(function (response) {
+                        console.log('======== SUCCESS ========')
+                        console.log(response);
+                        self.pairwise_cache.data = response.data.collection;
+                        self.pairwise_cache.total = response.data.total;
+                        self.pairwise_cache.filtered_total = null;
+                    }).catch(function (error) {
+                        let detail = error.data.detail
+                        console.log('======== ERROR ========')
+                        console.log(error.data);
+                    });
+                    return null;
+                }
+            },
+            connections_for_page: function() {
+                if (this.connections) {
+                    let from_index = (this.pairwise_cache.current_page - 1) * this.pairwise_cache.page_size;
+                    let to_index = from_index + this.pairwise_cache.page_size;
+                    let data = this.connections.slice(from_index, to_index);
+                    return data;
+                }
+                else {
+                    return [];
+                }
+            },
+            pretty_connection_details: function() {
+                if (this.pairwise_details) {
+                    return JSON.stringify(this.pairwise_details, null, 2);
+                }
+                else {
+                    return "";
+                }
+            },
+            ping_status_caption: function(){
+                if (this.form_webroot.ping == 'success') {
+                    return 'webroot is reachable'
+                }
+                else if (this.form_webroot.ping == 'error') {
+                    return 'webroot is unreachable'
+                }
+                else if (this.form_webroot.ping == 'starting'){
+                    return 'checking if webroot is reachable...'
+                }
+                else {
+                    return ''
+                }
+            },
+            ssl_apply_enabled: function(){
+                let enabled = false;
+                if (this.form_ssl.option === 'manual') {
+                    enabled = this.form_ssl.cert_file && this.form_ssl.cert_file;
+                    if (!enabled) {
+                        this.form_ssl.error = 'You should set env vars CERT_FILE and CERT_KEY_FILE to enable this option';
+                    }
+                }
+                else if (this.form_ssl.option === 'acme') {
+                    enabled = !(this.form_ssl.cert_file && this.form_ssl.cert_file) && this.form_ssl.acme_dir;
+                    if (!enabled) {
+                        if (!this.form_ssl.acme_dir) {
+                            this.form_ssl.error = 'You should set ACME_DIR env var to enable this option';
+                        }
+                        else {
+                            this.form_ssl.error = 'You should unset env vars CERT_FILE and CERT_KEY_FILE to enable this option';
+                        }
+                    }
+                }
+                else if (this.form_ssl.option === 'external') {
+                    enabled = !(this.form_ssl.cert_file && this.form_ssl.cert_file);
+                    if (!enabled) {
+                        this.form_ssl.error = 'You should unset env vars CERT_FILE and CERT_KEY_FILE to enable this option';
+                    }
+                }
+                if (enabled) {
+                    this.form_ssl.error = '';
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            },
+            firebase_apply_enabled: function(){
+                if (this.form_firebase.skip) {
+                    return false;
+                }
+                let env_filled = '{{ env.firebase_api_key }}' || '{{ env.firebase_api_key }}';
+                if (env_filled){
+                    this.form_firebase.error = 'Unset env vars FCM_API_KEY and FCM_SENDER_ID to enable this option.';
+                    return false;
+                }
+                else {
+                    this.form_firebase.error = '';
+                    return true;
+                }
+            },
+            connections_page_count: function(){
+                if (this.pairwise_cache.filtered_total !== null) {
+                    return Math.ceil(this.pairwise_cache.filtered_total / this.pairwise_cache.page_size);
+                }
+                else {
+                    return Math.ceil(this.pairwise_cache.total / this.pairwise_cache.page_size);
+                }
+            }
+        },
+        watch: {
+            pairwise_search: function(new_val, old_val){
+                if (new_val.length) {
+                    this.pairwise_cache.filtered_total = null;
+                    this.pairwise_cache.current_page = 1;
+                    this.pairwise_details = null;
+                }
+            }
+        }
+    });
+
+    function connect() {
+        let stream_socket = new WebSocket('{{events_stream_ws}}');
+
+        stream_socket.onclose = function (event) {
+            setTimeout(function() {
+              connect();
+            }, 1000);
+        };
+
+        stream_socket.onmessage = function (event) {
+            app.$data.events_stream_is_active = true;
+            let js = JSON.parse(event.data);
+            app.$data.log += '\r\n' + js.msg;
+            let log = document.getElementById('log');
+            if (log) {
+                log.scrollTop = log.scrollHeight;
+            }
+        };
+
+        stream_socket.onerror = function (error) {
+            console.log("WS Error " + error.message);
+        };
+    }
+
+    connect();
+
+</script>
+
+</body>
+
+</html>

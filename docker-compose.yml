@@ -1,0 +1,47 @@
+version: '3'
+
+services: 
+  db:
+    image: postgres:13.1
+    environment:
+      - POSTGRES_PASSWORD=postgres
+
+  memcached:
+    image: memcached
+
+  redis1:
+    image: redis
+  redis2:
+    image: redis
+
+  application:
+    build:
+      context: .
+    image: "socialsirius/didcomm:${VERSION-dev}"
+    command: bash -c "python main.py"
+    environment:
+      - TEAMCITY_VERSION
+      - MEMCACHED=memcached
+      - REDIS=redis://redis1,redis://redis2
+      - DATABASE_HOST=db
+      - DATABASE_USER=postgres
+      - DATABASE_NAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - WEBROOT=http://didcomm.server.com
+      - SEED=000000000000000000000000000RELAY
+      - LOGLEVEL=DEBUG
+      - FCM_API_KEY=fake-key
+      - FCM_SENDER_ID=fake-id
+      - ACME_DIR=/certs
+    volumes:
+      - ./app:/app
+      - ./certs:/certs
+    ports:
+      - "8000:8000"
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - db
+      - memcached
+      - redis1
+      - redis2
